@@ -113,8 +113,10 @@ export default class Preferences extends ExtensionPreferences {
     builder.add_from_file(`${UIFolderPath}/appearance.ui`);
     builder.add_from_file(`${UIFolderPath}/accelerator.ui`);
     builder.add_from_file(`${UIFolderPath}/menu.ui`);
+    builder.add_from_file(`${UIFolderPath}/advanced.ui`);
     window.add(builder.get_object('general'));
     window.add(builder.get_object('appearance'));
+    window.add(builder.get_object('advanced'));
     window.set_search_enabled(true);
 
     if (builder.get_object('qr')) {
@@ -132,6 +134,24 @@ export default class Preferences extends ExtensionPreferences {
 
     this.addButtonEvents(window, builder, settings);
     this.addMenu(window, builder);
+
+    // Connect string settings (GtkEntry) manually
+    ['ai-api-key', 'file-search-root'].forEach(name => {
+      let widget = builder.get_object(name);
+      if (!widget)
+        return;
+      widget.set_text(settings.get_string(name) || '');
+      widget.connect('changed', w => settings.set_string(name, w.get_text()));
+    });
+
+    // Connect integer settings (GtkSpinButton) manually
+    ['file-search-max-results', 'ai-max-context-kb', 'search-history-max', 'ai-history-max'].forEach(name => {
+      let widget = builder.get_object(name);
+      if (!widget)
+        return;
+      widget.set_value(settings.get_int(name));
+      widget.connect('value-changed', w => settings.set_int(name, w.get_value_as_int()));
+    });
 
     this._monitorsConfig = new MonitorsConfig();
     this._monitorsConfig.connect('updated', () => this.updateMonitors());
