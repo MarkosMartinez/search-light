@@ -3,6 +3,9 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 
+const DEBOUNCE_DELAY_MS = 400;
+const SEARCH_TIMEOUT_MS = 3000;
+
 export class FileSearch {
   constructor() {
     this._proc = null;
@@ -14,7 +17,7 @@ export class FileSearch {
       GLib.source_remove(this._debounceId);
       this._debounceId = null;
     }
-    this._debounceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+    this._debounceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DEBOUNCE_DELAY_MS, () => {
       this._debounceId = null;
       this._doSearch(query, options, callback);
       return GLib.SOURCE_REMOVE;
@@ -81,8 +84,12 @@ export class FileSearch {
         Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE
       );
       this._proc = proc;
-      let killTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 3000, () => {
-        try { proc.force_exit(); } catch (_e) {}
+      let killTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, SEARCH_TIMEOUT_MS, () => {
+        try {
+          proc.force_exit();
+        } catch (_e) {
+          // ignore
+        }
         return GLib.SOURCE_REMOVE;
       });
       proc.communicate_utf8_async(null, null, (_proc, res) => {
@@ -106,7 +113,11 @@ export class FileSearch {
 
   _cancel() {
     if (this._proc) {
-      try { this._proc.force_exit(); } catch (_e) {}
+      try {
+        this._proc.force_exit();
+      } catch (_e) {
+        // ignore
+      }
       this._proc = null;
     }
   }

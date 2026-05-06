@@ -7,6 +7,10 @@ parserOptions:
   ecmaVersion: 2022
   sourceType: module
 
+globals:
+  TextDecoder: readonly
+  TextEncoder: readonly
+
 ignorePatterns:
   - tests/
   - drawing.js

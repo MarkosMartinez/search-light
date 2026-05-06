@@ -76,7 +76,7 @@ export class AiProvider {
       while ((info = enumerator.next_file(null)) !== null) {
         if (info.get_file_type() === Gio.FileType.REGULAR) {
           let mime = info.get_content_type() || '';
-          if (mime.startsWith('text/') || mime === 'application/json')
+          if (this._isReadableMime(mime))
             result.push(GLib.build_filenamev([dirPath, info.get_name()]));
         }
       }
@@ -85,6 +85,24 @@ export class AiProvider {
       // ignore
     }
     return result;
+  }
+
+  _isReadableMime(mime) {
+    if (!mime)
+      return false;
+    if (mime.startsWith('text/'))
+      return true;
+    const READABLE_APP_MIMES = new Set([
+      'application/json',
+      'application/javascript',
+      'application/xml',
+      'application/yaml',
+      'application/x-yaml',
+      'application/toml',
+      'application/x-sh',
+      'application/x-python',
+    ]);
+    return READABLE_APP_MIMES.has(mime);
   }
 
   _queryClaude(apiKey, messages, callback) {
