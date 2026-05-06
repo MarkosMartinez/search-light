@@ -119,6 +119,54 @@ export const SettingsKeys = () => {
       default_value: 100,
       widget_type: 'scale',
     },
+    'file-search-enabled': {
+      default_value: true,
+      widget_type: 'switch',
+    },
+    'file-search-root': {
+      default_value: '~',
+      widget_type: 'string',
+    },
+    'file-search-use-locate': {
+      default_value: true,
+      widget_type: 'switch',
+    },
+    'file-search-max-results': {
+      default_value: 50,
+      widget_type: 'dropdown',
+    },
+    'ai-enabled': {
+      default_value: false,
+      widget_type: 'switch',
+    },
+    'ai-provider': {
+      default_value: 0,
+      widget_type: 'dropdown',
+    },
+    'ai-api-key': {
+      default_value: '',
+      widget_type: 'string',
+    },
+    'ai-max-context-kb': {
+      default_value: 32,
+      widget_type: 'dropdown',
+    },
+    'search-history-enabled': {
+      default_value: false,
+      widget_type: 'switch',
+    },
+    'search-history-max': {
+      default_value: 100,
+      widget_type: 'dropdown',
+    },
+    'ai-history-enabled': {
+      default_value: false,
+      widget_type: 'switch',
+    },
+    'ai-history-max': {
+      default_value: 50,
+      widget_type: 'dropdown',
+    },
   });
 
   return settingsKeys;

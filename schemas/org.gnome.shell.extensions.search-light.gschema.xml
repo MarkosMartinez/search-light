@@ -137,5 +137,65 @@
 	<summary>Animation speed</summary>
 	<description>Change the speed of the appear and disappear window effect.</description>
     </key>
+    <key type="b" name="file-search-enabled">
+        <default>true</default>
+        <summary>Enable file content search</summary>
+        <description>Search inside files using the &gt; prefix.</description>
+    </key>
+    <key type="s" name="file-search-root">
+        <default>"~"</default>
+        <summary>File search root directory</summary>
+        <description>Root directory for file content search.</description>
+    </key>
+    <key type="b" name="file-search-use-locate">
+        <default>true</default>
+        <summary>Use locate for faster file search</summary>
+        <description>Try mlocate/plocate first; fall back to grep if unavailable.</description>
+    </key>
+    <key type="i" name="file-search-max-results">
+        <default>50</default>
+        <summary>Maximum file search results</summary>
+        <description>Maximum number of file results to display.</description>
+    </key>
+    <key type="b" name="ai-enabled">
+        <default>false</default>
+        <summary>Enable AI mode</summary>
+        <description>Enable AI question-answering using the ? prefix.</description>
+    </key>
+    <key type="i" name="ai-provider">
+        <default>0</default>
+        <summary>AI provider</summary>
+        <description>0 = Claude (Anthropic), 1 = Gemini (Google).</description>
+    </key>
+    <key type="s" name="ai-api-key">
+        <default>""</default>
+        <summary>AI API key</summary>
+        <description>API key for the selected AI provider.</description>
+    </key>
+    <key type="i" name="ai-max-context-kb">
+        <default>32</default>
+        <summary>Maximum AI context size (KB)</summary>
+        <description>Maximum total size in KB of @-attached file content sent to the AI.</description>
+    </key>
+    <key type="b" name="search-history-enabled">
+        <default>false</default>
+        <summary>Enable search history</summary>
+        <description>Show recent searches when the search box is empty.</description>
+    </key>
+    <key type="i" name="search-history-max">
+        <default>100</default>
+        <summary>Maximum search history entries</summary>
+        <description>Maximum number of search queries to remember.</description>
+    </key>
+    <key type="b" name="ai-history-enabled">
+        <default>false</default>
+        <summary>Enable AI chat history</summary>
+        <description>Save and allow resuming AI conversations.</description>
+    </key>
+    <key type="i" name="ai-history-max">
+        <default>50</default>
+        <summary>Maximum saved AI conversations</summary>
+        <description>Maximum number of AI conversations to keep on disk.</description>
+    </key>
   </schema>
 </schemalist>

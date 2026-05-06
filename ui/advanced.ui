@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <object class="AdwPreferencesPage" id="advanced">
+    <property name="name">advanced</property>
+    <property name="title" translatable="yes">Advanced</property>
+    <property name="icon-name">preferences-system-symbolic</property>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title" translatable="yes">File Content Search (prefix: &gt;)</property>
+        <property name="description" translatable="yes">Search inside files by typing &gt; followed by your query. Uses locate (fast) or grep (thorough).</property>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Enable File Search</property>
+            <property name="activatable-widget">file-search-enabled</property>
+            <child>
+              <object class="GtkSwitch" id="file-search-enabled">
+                <property name="valign">center</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Use locate Command</property>
+            <property name="subtitle" translatable="yes">Try mlocate/plocate first for instant filename search. Falls back to grep for content search.</property>
+            <property name="activatable-widget">file-search-use-locate</property>
+            <child>
+              <object class="GtkSwitch" id="file-search-use-locate">
+                <property name="valign">center</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Search Root Directory</property>
+            <property name="subtitle" translatable="yes">Directory to search in (default: ~)</property>
+            <child>
+              <object class="GtkEntry" id="file-search-root">
+                <property name="valign">center</property>
+                <property name="hexpand">true</property>
+                <property name="width-request">200</property>
+                <property name="placeholder-text">~</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Max Results</property>
+            <property name="subtitle" translatable="yes">Maximum number of file results to display</property>
+            <child>
+              <object class="GtkSpinButton" id="file-search-max-results">
+                <property name="valign">center</property>
+                <property name="adjustment">file-search-max-results-adj</property>
+                <property name="climb-rate">1</property>
+                <property name="digits">0</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title" translatable="yes">AI Mode (prefix: ?)</property>
+        <property name="description" translatable="yes">Ask Claude or Gemini questions by typing ? followed by your query. Attach files with @/path/to/file or @~/folder.</property>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Enable AI Mode</property>
+            <property name="activatable-widget">ai-enabled</property>
+            <child>
+              <object class="GtkSwitch" id="ai-enabled">
+                <property name="valign">center</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">AI Provider</property>
+            <property name="activatable-widget">ai-provider</property>
+            <child>
+              <object class="GtkDropDown" id="ai-provider">
+                <property name="valign">center</property>
+                <property name="model">ai-provider-model</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">API Key</property>
+            <property name="subtitle" translatable="yes">Your Claude (sk-ant-…) or Gemini (AIzaSy…) API key</property>
+            <child>
+              <object class="GtkEntry" id="ai-api-key">
+                <property name="valign">center</property>
+                <property name="hexpand">true</property>
+                <property name="width-request">220</property>
+                <property name="visibility">false</property>
+                <property name="placeholder-text">sk-ant-... or AIzaSy...</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Max Context Size (KB)</property>
+            <property name="subtitle" translatable="yes">Maximum total size of @-attached file content sent to the AI</property>
+            <child>
+              <object class="GtkSpinButton" id="ai-max-context-kb">
+                <property name="valign">center</property>
+                <property name="adjustment">ai-max-context-kb-adj</property>
+                <property name="climb-rate">1</property>
+                <property name="digits">0</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title" translatable="yes">Search History</property>
+        <property name="description" translatable="yes">Show recent searches when the search box is empty.</property>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Enable Search History</property>
+            <property name="activatable-widget">search-history-enabled</property>
+            <child>
+              <object class="GtkSwitch" id="search-history-enabled">
+                <property name="valign">center</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Max History Entries</property>
+            <child>
+              <object class="GtkSpinButton" id="search-history-max">
+                <property name="valign">center</property>
+                <property name="adjustment">search-history-max-adj</property>
+                <property name="climb-rate">1</property>
+                <property name="digits">0</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <property name="title" translatable="yes">AI Chat History</property>
+        <property name="description" translatable="yes">Save and resume AI conversations. History button appears in the AI response panel.</property>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Enable AI History</property>
+            <property name="activatable-widget">ai-history-enabled</property>
+            <child>
+              <object class="GtkSwitch" id="ai-history-enabled">
+                <property name="valign">center</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow">
+            <property name="title" translatable="yes">Max Saved Conversations</property>
+            <child>
+              <object class="GtkSpinButton" id="ai-history-max">
+                <property name="valign">center</property>
+                <property name="adjustment">ai-history-max-adj</property>
+                <property name="climb-rate">1</property>
+                <property name="digits">0</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+  <object class="GtkAdjustment" id="file-search-max-results-adj">
+    <property name="lower">5</property>
+    <property name="upper">500</property>
+    <property name="value">50</property>
+    <property name="step-increment">5</property>
+  </object>
+  <object class="GtkAdjustment" id="ai-max-context-kb-adj">
+    <property name="lower">4</property>
+    <property name="upper">256</property>
+    <property name="value">32</property>
+    <property name="step-increment">4</property>
+  </object>
+  <object class="GtkAdjustment" id="search-history-max-adj">
+    <property name="lower">10</property>
+    <property name="upper">1000</property>
+    <property name="value">100</property>
+    <property name="step-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="ai-history-max-adj">
+    <property name="lower">5</property>
+    <property name="upper">500</property>
+    <property name="value">50</property>
+    <property name="step-increment">5</property>
+  </object>
+  <object class="GtkStringList" id="ai-provider-model">
+    <items>
+      <item translatable="yes">Claude (Anthropic)</item>
+      <item translatable="yes">Gemini (Google)</item>
+    </items>
+  </object>
+</interface>

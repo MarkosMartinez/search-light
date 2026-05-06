@@ -35,6 +35,9 @@ import { BlurEffect } from './effects/blur_effect.js';
 
 import { schemaId, SettingsKeys } from './preferences/keys.js';
 import { KeyboardShortcuts } from './keybinding.js';
+import { FileSearch } from './fileSearch.js';
+import { AiProvider } from './aiProvider.js';
+import { SearchHistory, AiHistory } from './history.js';
 
 import {
   Extension,
@@ -209,6 +212,7 @@ export default class SearchLightExt extends Extension {
     this._updateProviders();
     this._updateWindowEffect();
     this._updateBlurredBackground();
+    this._initServices();
   }
 
   disable() {
@@ -247,6 +251,18 @@ export default class SearchLightExt extends Extension {
 
     this._removeProviders();
     this._providers = null;
+
+    if (this._fileSearch) {
+      this._fileSearch.destroy();
+      this._fileSearch = null;
+    }
+    if (this._aiProvider) {
+      this._aiProvider.destroy();
+      this._aiProvider = null;
+    }
+    this._searchHistory = null;
+    this._aiHistory = null;
+    this._aiMessages = [];
 
     if (this._background) {
       if (this._background.get_parent()) {
@@ -747,14 +763,28 @@ export default class SearchLightExt extends Extension {
           this._corners[3].y = this.height - this._corners[1].height;
           this._edges[3].y = this.height - 2;
         }
-        this._search.show();
+        this._handleTextChanged(this._search._text.get_text());
       },
     );
+
+    this._aiActivateId = this._search._text.connect('activate', () => {
+      if (this._aiModeActive)
+        this._sendAiMessage();
+    });
+
+    this._setupCustomPanels();
 
     this._search._text.get_parent().grab_key_focus();
   }
 
   _release_ui() {
+    // Save non-prefixed search queries to history before releasing
+    if (this.search_history_enabled && this._searchHistory && this._search && this._search._text) {
+      let currentText = this._search._text.get_text();
+      if (currentText && !currentText.startsWith('>') && !currentText.startsWith('?'))
+        this._searchHistory.add(currentText);
+    }
+
     if (this._entry) {
       if (this._entry.get_parent()) {
         this._entry.get_parent().remove_child(this._entry);
@@ -773,6 +803,10 @@ export default class SearchLightExt extends Extension {
       if (this._textChangedEventId) {
         this._search._text.disconnect(this._textChangedEventId);
         this._textChangedEventId = null;
+      }
+      if (this._aiActivateId) {
+        this._search._text.disconnect(this._aiActivateId);
+        this._aiActivateId = null;
       }
       if (this._search.__searchCancelled) {
         this._search._searchCancelled = this._search.__searchCancelled;
@@ -795,6 +829,25 @@ export default class SearchLightExt extends Extension {
       Main.overview.hide = Main.overview._hide;
       Main.overview._hide = null;
     }
+
+    // Destroy custom panels added in _setupCustomPanels
+    if (this._fileSearchPanel) {
+      if (this._fileSearchPanel.get_parent())
+        this._fileSearchPanel.get_parent().remove_child(this._fileSearchPanel);
+      this._fileSearchPanel.destroy();
+      this._fileSearchPanel = null;
+      this._fileResultsList = null;
+      this._filePanelHeader = null;
+    }
+    if (this._aiPanel) {
+      if (this._aiPanel.get_parent())
+        this._aiPanel.get_parent().remove_child(this._aiPanel);
+      this._aiPanel.destroy();
+      this._aiPanel = null;
+      this._aiResponseLabel = null;
+      this._aiStatusLabel = null;
+    }
+    this._aiModeActive = false;
   }
 
   _updateCss(_disable) {
@@ -1043,5 +1096,416 @@ export default class SearchLightExt extends Extension {
 
   _onFullScreen() {
     this.hide();
+  }
+
+  // ─── Services initialisation ─────────────────────────────────────────────
+
+  _initServices() {
+    this._fileSearch = new FileSearch();
+    this._aiProvider = new AiProvider();
+    this._aiMessages = [];
+    this._aiConversationId = null;
+    this._aiModeActive = false;
+
+    if (this.search_history_enabled)
+      this._searchHistory = new SearchHistory(this.search_history_max || 100);
+
+    if (this.ai_history_enabled)
+      this._aiHistory = new AiHistory(this.ai_history_max || 50);
+  }
+
+  // ─── Custom UI panels ────────────────────────────────────────────────────
+
+  _setupCustomPanels() {
+    // --- File search / history panel ---
+    this._fileSearchPanel = new St.BoxLayout({
+      name: 'searchLightFilePanel',
+      orientation: Clutter.Orientation.VERTICAL,
+      x_expand: true,
+      visible: false,
+    });
+
+    this._filePanelHeader = new St.Label({
+      text: 'File Results',
+      style: 'font-weight: bold; padding: 4px 8px;',
+      x_expand: true,
+    });
+    this._fileSearchPanel.add_child(this._filePanelHeader);
+
+    let fileScrollView = new St.ScrollView({
+      hscrollbar_policy: St.PolicyType.NEVER,
+      vscrollbar_policy: St.PolicyType.AUTOMATIC,
+      clip_to_allocation: true,
+      x_expand: true,
+      style: 'max-height: 300px;',
+    });
+    this._fileResultsList = new St.BoxLayout({
+      orientation: Clutter.Orientation.VERTICAL,
+      x_expand: true,
+    });
+    fileScrollView.add_child(this._fileResultsList);
+    this._fileSearchPanel.add_child(fileScrollView);
+    this.container.add_child(this._fileSearchPanel);
+
+    // --- AI panel ---
+    this._aiPanel = new St.BoxLayout({
+      name: 'searchLightAiPanel',
+      orientation: Clutter.Orientation.VERTICAL,
+      x_expand: true,
+      visible: false,
+    });
+
+    this._aiStatusLabel = new St.Label({
+      text: 'AI · Type a question and press Enter',
+      style: 'padding: 4px 8px; opacity: 0.7;',
+      x_expand: true,
+    });
+    this._aiPanel.add_child(this._aiStatusLabel);
+
+    let aiScrollView = new St.ScrollView({
+      hscrollbar_policy: St.PolicyType.NEVER,
+      vscrollbar_policy: St.PolicyType.AUTOMATIC,
+      clip_to_allocation: true,
+      x_expand: true,
+      style: 'min-height: 60px; max-height: 300px;',
+    });
+    this._aiResponseLabel = new St.Label({
+      text: '',
+      x_expand: true,
+      style: 'padding: 8px;',
+    });
+    this._aiResponseLabel.clutter_text.line_wrap = true;
+    this._aiResponseLabel.clutter_text.ellipsize = 0;
+    aiScrollView.add_child(this._aiResponseLabel);
+    this._aiPanel.add_child(aiScrollView);
+
+    let aiToolbar = new St.BoxLayout({
+      orientation: Clutter.Orientation.HORIZONTAL,
+      style: 'padding: 4px 8px; spacing: 8px;',
+    });
+    let aiNewBtn = new St.Button({
+      label: '+ New Chat',
+      style_class: 'button',
+      can_focus: true,
+    });
+    aiNewBtn.connect('clicked', () => this._newAiConversation());
+
+    let aiHistoryBtn = new St.Button({
+      label: '\u23F1 History',
+      style_class: 'button',
+      can_focus: true,
+    });
+    aiHistoryBtn.connect('clicked', () => this._showAiHistory());
+
+    aiToolbar.add_child(aiNewBtn);
+    aiToolbar.add_child(aiHistoryBtn);
+    this._aiPanel.add_child(aiToolbar);
+    this.container.add_child(this._aiPanel);
+  }
+
+  // ─── Text routing ────────────────────────────────────────────────────────
+
+  _handleTextChanged(text) {
+    if (!this._fileSearchPanel || !this._aiPanel)
+      return;
+
+    if (text.startsWith('> ')) {
+      let query = text.slice(2);
+      this._search.hide();
+      this._aiPanel.hide();
+      this._aiModeActive = false;
+      this._showFileMode(query);
+    } else if (text.startsWith('? ')) {
+      this._search.hide();
+      this._fileSearchPanel.hide();
+      this._showAiMode(text.slice(2));
+    } else if (text === '' && this.search_history_enabled && this._searchHistory) {
+      this._search.hide();
+      this._aiModeActive = false;
+      this._showSearchHistory();
+    } else {
+      this._hideCustomPanels();
+      this._aiModeActive = false;
+      this._search.show();
+    }
+  }
+
+  _hideCustomPanels() {
+    if (this._fileSearchPanel)
+      this._fileSearchPanel.hide();
+    if (this._aiPanel)
+      this._aiPanel.hide();
+  }
+
+  // ─── File search ─────────────────────────────────────────────────────────
+
+  _showFileMode(query) {
+    this._fileSearchPanel.show();
+    if (!this.file_search_enabled) {
+      this._filePanelHeader.set_text('File Search · Disabled in settings');
+      this._fileResultsList.destroy_all_children();
+      return;
+    }
+    if (!query || query.trim().length < 2) {
+      this._filePanelHeader.set_text('File Search · Type at least 2 characters');
+      this._fileResultsList.destroy_all_children();
+      return;
+    }
+    this._filePanelHeader.set_text(`File Search · Searching for "${query.trim()}"…`);
+    this._fileSearch.search(query.trim(), {
+      root: this.file_search_root || '~',
+      maxResults: this.file_search_max_results || 50,
+      useLocate: this.file_search_use_locate !== false,
+    }, results => this._populateFileResults(results, query.trim()));
+  }
+
+  _populateFileResults(results, query) {
+    if (!this._fileResultsList)
+      return;
+    this._fileResultsList.destroy_all_children();
+    if (results.length === 0) {
+      this._filePanelHeader.set_text(`File Search · No results for "${query}"`);
+      return;
+    }
+    this._filePanelHeader.set_text(`File Search · ${results.length} result(s) for "${query}"`);
+    results.forEach(path => this._fileResultsList.add_child(this._createFileResultItem(path)));
+  }
+
+  _createFileResultItem(path) {
+    let btn = new St.Button({
+      can_focus: true,
+      track_hover: true,
+      x_align: Clutter.ActorAlign.FILL,
+      x_expand: true,
+      style_class: 'search-result',
+    });
+    let box = new St.BoxLayout({
+      orientation: Clutter.Orientation.HORIZONTAL,
+      x_expand: true,
+    });
+    let icon = new St.Icon({
+      gicon: new Gio.ThemedIcon({ name: 'text-x-generic-symbolic' }),
+      icon_size: 16,
+      style: 'padding: 4px;',
+    });
+    let label = new St.Label({
+      text: path,
+      x_expand: true,
+      style: 'padding: 4px 8px;',
+    });
+    box.add_child(icon);
+    box.add_child(label);
+    btn.set_child(box);
+    btn.connect('clicked', () => {
+      this._openFile(path);
+      this.hide();
+    });
+    return btn;
+  }
+
+  _openFile(path) {
+    try {
+      let uri = Gio.File.new_for_path(path).get_uri();
+      Gio.AppInfo.launch_default_for_uri(uri, null);
+    } catch (e) {
+      logError(e, `SearchLight: failed to open ${path}`);
+    }
+  }
+
+  // ─── Search history ───────────────────────────────────────────────────────
+
+  _showSearchHistory() {
+    if (!this._searchHistory || !this._fileSearchPanel)
+      return;
+    let histEntries = this._searchHistory.entries.slice(0, 10);
+    if (histEntries.length === 0) {
+      this._fileSearchPanel.hide();
+      return;
+    }
+    this._filePanelHeader.set_text('Recent Searches');
+    this._fileResultsList.destroy_all_children();
+    histEntries.forEach(entry => {
+      let btn = new St.Button({
+        can_focus: true,
+        track_hover: true,
+        x_align: Clutter.ActorAlign.FILL,
+        x_expand: true,
+        style_class: 'search-result',
+      });
+      let label = new St.Label({
+        text: entry.query,
+        x_expand: true,
+        style: 'padding: 4px 8px;',
+      });
+      btn.set_child(label);
+      btn.connect('clicked', () => {
+        if (this._search && this._search._text) {
+          this._search._text.set_text(entry.query);
+          this._search._text.set_cursor_position(-1);
+        }
+      });
+      this._fileResultsList.add_child(btn);
+    });
+    this._fileSearchPanel.show();
+  }
+
+  // ─── AI mode ─────────────────────────────────────────────────────────────
+
+  _showAiMode(queryText) {
+    this._aiModeActive = true;
+    this._aiPanel.show();
+    let trimmed = queryText ? queryText.trim() : '';
+    if (!this._aiResponseLabel.clutter_text.get_text()) {
+      if (trimmed) {
+        let preview = trimmed.length > 50 ? `${trimmed.slice(0, 50)}…` : trimmed;
+        this._aiStatusLabel.set_text(`AI · Ready — press Enter to send: "${preview}"`);
+      } else {
+        this._aiStatusLabel.set_text('AI · Type a question and press Enter');
+      }
+    }
+  }
+
+  _parseAiQuery(text) {
+    let files = [];
+    let query = text.replace(/@(\S+)/gu, (_match, filePath) => {
+      let expanded = filePath;
+      if (expanded.startsWith('~'))
+        expanded = `${GLib.get_home_dir()}${expanded.slice(1)}`;
+      files.push(expanded);
+      return '';
+    }).trim();
+    return { query, files };
+  }
+
+  _sendAiMessage() {
+    if (!this._search || !this._search._text)
+      return;
+    let inputText = this._search._text.get_text();
+    if (!inputText.startsWith('? '))
+      return;
+    let queryText = inputText.slice(2).trim();
+    if (!queryText)
+      return;
+
+    let { query, files } = this._parseAiQuery(queryText);
+    if (!query)
+      return;
+
+    if (!this.ai_enabled) {
+      if (this._aiStatusLabel)
+        this._aiStatusLabel.set_text('AI · Enable AI mode in the extension settings');
+      return;
+    }
+    if (!this.ai_api_key) {
+      if (this._aiStatusLabel)
+        this._aiStatusLabel.set_text('AI · Set your API key in the extension settings');
+      return;
+    }
+
+    this._aiMessages.push({ role: 'user', content: query });
+
+    if (!this._aiConversationId && this.ai_history_enabled && this._aiHistory)
+      this._aiConversationId = this._aiHistory.newId();
+
+    if (this._aiStatusLabel)
+      this._aiStatusLabel.set_text('AI · Thinking…');
+    if (this._aiResponseLabel)
+      this._aiResponseLabel.set_text('…');
+
+    this._aiProvider.query({
+      provider: this.ai_provider || 0,
+      apiKey: this.ai_api_key,
+      messages: this._aiMessages.slice(),
+      contextFiles: files,
+      maxContextKb: this.ai_max_context_kb || 32,
+    }, (error, response) => {
+      if (!this._aiPanel)
+        return;
+      if (error) {
+        this._aiMessages.pop();
+        this._showAiResponse(`Error: ${error}`, true);
+      } else {
+        this._aiMessages.push({ role: 'assistant', content: response });
+        this._showAiResponse(response, false);
+        if (this._aiConversationId && this.ai_history_enabled && this._aiHistory)
+          this._aiHistory.saveConversation(this._aiConversationId, this._aiMessages);
+      }
+    });
+
+    // Clear entry but keep AI prefix for continuation
+    this._search._text.set_text('? ');
+    this._search._text.set_cursor_position(-1);
+  }
+
+  _showAiResponse(text, isError) {
+    if (!this._aiResponseLabel || !this._aiStatusLabel)
+      return;
+    this._aiResponseLabel.set_text(text);
+    let assistantCount = this._aiMessages.filter(m => m.role === 'assistant').length;
+    if (isError)
+      this._aiStatusLabel.set_text('AI · Error — check your API key and try again');
+    else
+      this._aiStatusLabel.set_text(`AI · ${assistantCount} response(s) — type ? to continue`);
+  }
+
+  _newAiConversation() {
+    this._aiMessages = [];
+    this._aiConversationId = null;
+    if (this._aiResponseLabel)
+      this._aiResponseLabel.set_text('');
+    if (this._aiStatusLabel)
+      this._aiStatusLabel.set_text('AI · Type a question and press Enter');
+  }
+
+  _showAiHistory() {
+    if (!this.ai_history_enabled || !this._aiHistory || !this._fileSearchPanel)
+      return;
+    let conversations = this._aiHistory.listConversations();
+    if (conversations.length === 0) {
+      if (this._aiStatusLabel)
+        this._aiStatusLabel.set_text('AI · No saved conversations yet');
+      return;
+    }
+    this._filePanelHeader.set_text('AI Chat History');
+    this._fileResultsList.destroy_all_children();
+    conversations.forEach(conv => {
+      let btn = new St.Button({
+        can_focus: true,
+        track_hover: true,
+        x_align: Clutter.ActorAlign.FILL,
+        x_expand: true,
+        style_class: 'search-result',
+      });
+      let when = new Date(conv.timestamp).toLocaleDateString();
+      let labelText = conv.preview ? `${conv.preview} (${when})` : when;
+      let label = new St.Label({
+        text: labelText,
+        x_expand: true,
+        style: 'padding: 4px 8px;',
+      });
+      btn.set_child(label);
+      btn.connect('clicked', () => this._loadAiConversation(conv.id));
+      this._fileResultsList.add_child(btn);
+    });
+    this._fileSearchPanel.show();
+  }
+
+  _loadAiConversation(convId) {
+    if (!this._aiHistory)
+      return;
+    let data = this._aiHistory.loadConversation(convId);
+    if (!data)
+      return;
+    this._aiMessages = data.messages.slice();
+    this._aiConversationId = convId;
+    let lastAssistant = this._aiMessages.filter(m => m.role === 'assistant').pop();
+    if (lastAssistant && this._aiResponseLabel)
+      this._aiResponseLabel.set_text(lastAssistant.content);
+    if (this._aiStatusLabel)
+      this._aiStatusLabel.set_text(`AI · Resumed (${this._aiMessages.length} messages)`);
+    if (this._fileSearchPanel)
+      this._fileSearchPanel.hide();
+    if (this._aiPanel)
+      this._aiPanel.show();
   }
 }

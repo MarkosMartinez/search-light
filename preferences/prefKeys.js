@@ -155,6 +155,10 @@ export let PrefKeys = class {
           key.value = settings.get_value(name).deepUnpack();
           break;
         }
+        case 'string': {
+          key.value = settings.get_string(name);
+          break;
+        }
       }
 
       this._settingsListeners.push(
